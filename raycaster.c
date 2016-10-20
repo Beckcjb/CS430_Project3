@@ -1,7 +1,7 @@
 // Charles Beck
 // CS 430
-// 10/4/16
-// PROJECT 2: RAYCASTER
+// 10/16/16
+// PROJECT 3: RAYCASTER With ILLUMINATION
 // ==================================================================================
 /* 	   
 	   This program reads in five arguments from the comand line in the order of :
@@ -12,7 +12,9 @@
    Then the program will parse the deisred JSON file while error checking for a 
    well made and valid JSON file. After the program gets through parsing, the data
    is stored into structures that will allow the program to test intersections of pixels 
-   with a ray that is constructed and shot at every pixel in the scene. The program will
+   with a ray that is constructed and shot at every pixel in the scene. The program will add
+   lighting and shadows to the objects based off of intersections with each other and the
+   light ray vector. This is done with various illimination porperties and formulas. The program will
    store the intersection data and then write it to a P3 ppm file format with color. 
 */  
 // ==================================================================================
@@ -81,7 +83,7 @@ int shadows(Object objects[], double* newRd, double* newRo, int items, int close
      // Do intersections with new Ron and Rdn of all other objects in the scene(planes or spheres)
     int k;
     int newBest_o = -1;
-   // printf("%d", closestObject);
+ 
     normalize(newRd);
     double newBestT = INFINITY;
 
@@ -89,7 +91,7 @@ int shadows(Object objects[], double* newRd, double* newRo, int items, int close
     {   // skip the closest object
         double newT = 0;
         if (k == closestObject)
-        { //printf("hey");
+        {
             continue;
         }
         else if(strcmp(objects[k].type, "sphere") == 0){
@@ -98,7 +100,6 @@ int shadows(Object objects[], double* newRd, double* newRo, int items, int close
         } else if(strcmp(objects[k].type, "plane") == 0){
             newT = planeIntersection(objects[k].structures.plane.position, objects[k].structures.plane.normal, newRd, newRo);
         }
-        // Shade the pixel because there is another object in the way of the light source
 
         if (maxDistance != INFINITY && newT > maxDistance)
 
@@ -118,12 +119,8 @@ int shadows(Object objects[], double* newRd, double* newRo, int items, int close
 
 }
 
-// Find the diffuse for the closest object
-// takes in the object normal, light vector, light color, and the objects diffuse color
-// places the result into the outColor
 void diffuseHandle(double *objNormal, double *light, double *illumColor, double *objDiffuse, double *outColor) {
 
-    // K_a*I_a should be added to the beginning of this whole thing, which is a constant and ambient light
     double normDotLight = v3_dot(objNormal, light);
 
     if (normDotLight > 0)
@@ -134,15 +131,11 @@ void diffuseHandle(double *objNormal, double *light, double *illumColor, double 
         diffuseProduct[1] = objDiffuse[1] * illumColor[1];
         diffuseProduct[2] = objDiffuse[2] * illumColor[2];
 
-        // multiply by n_dot_l and store in out_color
         v3_scale(diffuseProduct, normDotLight, outColor);
-        /*printf("Color is: %lf", outColor[1]);
-        printf("Color is: %lf", outColor[2]);*/
     }
 
     else
     {
-        // would normally return K_a*I_a here...
         outColor[0] = 0;
         outColor[1] = 0;
         outColor[2] = 0;
@@ -150,10 +143,7 @@ void diffuseHandle(double *objNormal, double *light, double *illumColor, double 
     }
 }
 
-// Find the specular for the closest object
-// Takes in the ns which as shown in class we can set to one for testing at least
-// light vector, light reflection, object normal, ray direction(V), object specular, light color
-// Returns the proper color in the out color
+
 void specularHandle(double ns, double *light, double *lightRef, double *objNormal,
                         double *V, double *objSpecular, double *illumColor, double *outColor) {
 
