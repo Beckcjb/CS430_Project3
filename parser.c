@@ -140,46 +140,46 @@ double* next_vec(FILE* json)
 
 // Reads in a scene of objects taken from a JSON file
 int read_scene(FILE *json, Object objects[]){
-    int c, items;
+       int c, items;
 	double *vector;
 	char *key, *value;
 	items = 0;
+
+	// Skip whitespace(s) read in the first character
 	skip_ws(json);
+
 	c = next_c(json);
-	
-	if(c != '['){
+
+	// Check to see if the first character is an opening bracket
+	if(c != '[')
+    {
 		fprintf(stderr, "Error, line number %d; invalid scene definition '%c'\n", lineNumber, c);
 		fclose(json);
-		exit(-1);
+		exit(1);
 	}
 
 	skip_ws(json);
 	c = next_c(json);
 
 	// Check to see if the json file has no objects in it
-	if(c != ']'){
-		ungetc(c, json);
-	}
+	if(c != ']') ungetc(c, json);
 
 	while(c != ']'){
 		skip_ws(json);
 		c = next_c(json);
 
-
 		if(c != '{'){
 			fprintf(stderr, "Error, line number %d; invalid object definition '%c'\n", lineNumber, c);
 			fclose(json);
-			exit(-1);
+			exit(1);
 		}
 
 		skip_ws(json);
 		c = next_c(json);
 
 		while(c != '}'){
+			if(c == '"') ungetc(c, json);
 
-			if(c == '"'){
-				ungetc(c, json);
-			}
 			key = next_str(json);
 
 			if(strcmp(key, "type") == 0){
@@ -187,158 +187,312 @@ int read_scene(FILE *json, Object objects[]){
 				c = next_c(json);
 
 				if(c != ':'){
-					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+					fprintf(stderr, "Error, line number %d; invalid '%c'.\n", lineNumber, c);
 					fclose(json);
-					exit(-1);
+					exit(1);
 
 				}
-
+				// Get the type of the object and place it into our object array
 				else{
 					skip_ws(json);
 					value = next_str(json);
 					objects[items].type = value;
+					// if we have a light then lets set all peramiters
+					if(strcmp(value, "light") == 0){
+                        objects[items].structures.light.angular_a0 = 0;
+                        objects[items].structures.light.radial_a1 = 0;
+                        objects[items].structures.light.radial_a2 = 0;
+                        objects[items].structures.light.radial_a0 = 0;
+
+                        objects[items].structures.light.direction[0] = 0;
+                        objects[items].structures.light.direction[1] = 0;
+                        objects[items].structures.light.direction[2] = 0;
+                    }
 				}
 
-			} 
+				} 
 			else if(strcmp(key, "width") == 0) {
 
 				skip_ws(json);
-
+				
 				c = next_c(json);
 
-				if(c != ':') {
-
-					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid  '%c'.\n", lineNumber, c);
 					fclose(json);
-					exit(1);
+					exit(-3);
 				}
-				
+												// place widht in the camera structure in the object array
 				else{
 					skip_ws(json);
 					objects[items].structures.camera.width = next_num(json);
 				}
 
-			} 
+				} 
 			else if(strcmp(key, "height") == 0) {
 
 				skip_ws(json);
 				c = next_c(json);
 
-				if(c != ':') {
-
-					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid  '%c'.\n", lineNumber, c);
 					fclose(json);
 					exit(1);
 				}
-
+				// place height in the camera structure in the objects array
 				else{
 					skip_ws(json);
 					objects[items].structures.camera.height = next_num(json);
 				}
 
-			} 
+				}	 
 			else if(strcmp(key, "radius") == 0) {
 
 				skip_ws(json);
 				c = next_c(json);
 
-				if(c != ':') {
-
-					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid '%c'.\n", lineNumber, c);
 					fclose(json);
-					exit(-1);
-
+					exit(1);
 				}
 				else{
 					skip_ws(json);
 					objects[items].structures.sphere.radius = next_num(json);
 				}
 
-			}
+				} 
+			else if(strcmp(key, "radial-a0") == 0) {
+
+				skip_ws(json);
+				c = next_c(json);
+
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+					fclose(json);
+					exit(1);
+				}
+				else{
+					skip_ws(json);
+					objects[items].structures.light.radial_a0 = next_num(json);
+				}
+
+				} 
+			else if(strcmp(key, "radial-a1") == 0) {
+
+				skip_ws(json);
+				c = next_c(json);
+
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+					fclose(json);
+					exit(1);
+				}
+				else{
+					skip_ws(json);
+					objects[items].structures.light.radial_a1 = next_num(json);
+				}
+
+				} 
+			else if(strcmp(key, "radial-a2") == 0) {
+
+				skip_ws(json);
+				c = next_c(json);
+
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+					fclose(json);
+					exit(1);
+				}
+				else{
+					skip_ws(json);
+					objects[items].structures.light.radial_a2 = next_num(json);
+				}
+
+				} 
+			else if(strcmp(key, "angular-a0") == 0) {
+
+				skip_ws(json);
+				c = next_c(json);
+
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+					fclose(json);
+					exit(1);
+				}
+				else{
+					skip_ws(json);
+					objects[items].structures.light.angular_a0 = next_num(json);
+				}
+
+				} 
 			else if(strcmp(key, "color") == 0) {
 
 				skip_ws(json);
 				c = next_c(json);
 
-				if(c != ':') {
-
+				if(c != ':'){
 					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
 					fclose(json);
 					exit(1);
-
 				}
+					// store color
 				else{
 					skip_ws(json);
-					vector = next_vec(json);
+					vector = nextVector(json);
 
-					if(strcmp(objects[items].type, "sphere") == 0){
-						objects[items].structures.sphere.color[0] = vector[0];
-						objects[items].structures.sphere.color[1] = vector[1];
-						objects[items].structures.sphere.color[2] = vector[2];
-
-					} 
-					else if(strcmp(objects[items].type, "plane") == 0) {
-
-						objects[items].structures.plane.color[0] = vector[0];
-						objects[items].structures.plane.color[1] = vector[1];
-						objects[items].structures.plane.color[2] = vector[2];
+                        if(strcmp(objects[items].type, "light") == 0){
+                        objects[items].structures.light.color[0] = vector[0];
+						objects[items].structures.light.color[1] = vector[1];
+						objects[items].structures.light.color[2] = vector[2];
 					}
+
 				}
 
-			} 
+				}
+			else if(strcmp(key, "diffuse_color") == 0) {
+
+				skip_ws(json);
+				c = next_c(json);
+
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+					fclose(json);
+					exit(1);
+				}
+							// Save diffuse color
+				else{
+					skip_ws(json);
+					vector = nextVector(json);
+					if(strcmp(objects[items].type, "plane") == 0) {
+
+						objects[items].structures.plane.diffuseColor[0] = vector[0];
+						objects[items].structures.plane.diffuseColor[1] = vector[1];
+						objects[items].structures.plane.diffuseColor[2] = vector[2];
+
+					}else if(strcmp(objects[items].type, "sphere") == 0) {
+
+                    objects[items].structures.sphere.diffuseColor[0] = vector[0];
+                    objects[items].structures.sphere.diffuseColor[1] = vector[1];
+                    objects[items].structures.sphere.diffuseColor[2] = vector[2];
+					}
+                }
+
+				} 
+			else if(strcmp(key, "specular_color") == 0) {
+
+				skip_ws(json);
+				c = next_c(json);
+
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+					fclose(json);
+					exit(1);
+				}
+							// store specular color
+				else{
+					skip_ws(json);
+					vector = nextVector(json);
+					if(strcmp(objects[items].type, "plane") == 0) {
+
+						objects[items].structures.plane.specularColor[0] = vector[0];
+						objects[items].structures.plane.specularColor[1] = vector[1];
+						objects[items].structures.plane.specularColor[2] = vector[2];
+
+					}
+					else if(strcmp(objects[items].type, "sphere") == 0) {
+
+                        objects[items].structures.sphere.specularColor[0] = vector[0];
+                        objects[items].structures.sphere.specularColor[1] = vector[1];
+                        objects[items].structures.sphere.specularColor[2] = vector[2];
+					}
+                }
+
+            }
 			else if(strcmp(key, "position") == 0) {
 
 				skip_ws(json);
 				c = next_c(json);
 
-				if(c != ':') {
-					fprintf(stderr, "Error, line number %d; invalid separator '%c'.\n", lineNumber, c);
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; invalid  '%c'.\n", lineNumber, c);
 					fclose(json);
 					exit(1);
-
 				}
+							// Save posotion
 				else{
 					skip_ws(json);
-					vector = next_vec(json);
+					vector = nextVector(json);
 
 					if(strcmp(objects[items].type, "sphere") == 0){
 						objects[items].structures.sphere.position[0] = vector[0];
 						objects[items].structures.sphere.position[1] = vector[1];
 						objects[items].structures.sphere.position[2] = vector[2];
 
-					} 
+					}
 					else if(strcmp(objects[items].type, "plane") == 0) {
 						objects[items].structures.plane.position[0] = vector[0];
 						objects[items].structures.plane.position[1] = vector[1];
 						objects[items].structures.plane.position[2] = vector[2];
+
+					} 
+					else if(strcmp(objects[items].type, "light") == 0){
+                        objects[items].structures.light.position[0] = vector[0];
+						objects[items].structures.light.position[1] = vector[1];
+						objects[items].structures.light.position[2] = vector[2];
 					}
+
 				}
 
-			} 
+				} 
 			else if(strcmp(key, "normal") == 0) {
 
 				skip_ws(json);
 				c = next_c(json);
 
-				if(c != ':') {
+				if(c != ':'){
 					fprintf(stderr, "Error, line number %d; unexpected character '%c'.\n", lineNumber, c);
 					fclose(json);
 					exit(-1);
-
 				}
 				else{
 					skip_ws(json);
 					vector = next_vec(json);
+
 					objects[items].structures.plane.normal[0] = vector[0];
 					objects[items].structures.plane.normal[1] = vector[1];
 					objects[items].structures.plane.normal[2] = vector[2];
 				}
 
+				} 
+			else if(strcmp(key, "direction") == 0) {
+
+				skip_ws(json);
+				c = next_c(json);
+
+				if(c != ':'){
+					fprintf(stderr, "Error, line number %d; unexpected character '%c'.\n", lineNumber, c);
+					fclose(json);
+					exit(1);
+				}
+								//Store Normal 
+				else{
+					skip_ws(json);
+					vector = next_vec(json);
+
+					objects[items].structures.light.direction[0] = vector[0];
+					objects[items].structures.light.direction[1] = vector[1];
+					objects[items].structures.light.direction[2] = vector[2];
+				}
+
 			}
+
+			//  exit the program
 			else{
+
 				fprintf(stderr, "Error, line number %d; invalid type '%s'.\n", key);
 				fclose(json);
-				exit(-1);
+				exit(1);
 			}
 
 			skip_ws(json);
