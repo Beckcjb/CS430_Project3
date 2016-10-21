@@ -25,28 +25,47 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <string.h>
-#include "vector_math.h"
 #include "parser.c"
 #include "ppmwrite.c"
+#include "vector_math.h"
 
+#define PI 3.14159265
 
-Object objects[128];				// Maximum number of objects
+Object objects[128];
 
-static inline double sqr(double v){	// Inline Square method , returns squared value
-
+static inline double sqr(double v)
+{
   return v*v;
 }
+static inline double v3_len(double* x)
+{
+    return sqrt(sqr(x[0]) + sqr(x[1]) + sqr(x[2]));
+}
 
-
-static inline void normalize(double* v){
+static inline void normalize(double* v)
+{
   double len = sqrt(sqr(v[0]) + sqr(v[1]) + sqr(v[2]));
   v[0] /= len;
   v[1] /= len;
   v[2] /= len;
 }
 
-// Light color clamp
+
+
+void v3_reflect(double* x, double* y, double* z)
+{
+    double scalar = 2.0 * v3_dot(x, y);
+
+    double tmp[3];
+
+  
+    v3_scale(y, scalar, tmp);
+
+    v3_subtract(x, tmp, z);
+
+}
+
+
 double clamp(double colorVal){
     double max = 1;
     double min = 0;
@@ -59,46 +78,75 @@ double clamp(double colorVal){
 }
 
 
-static inline double v3_len(double* x)
-{
-    return sqrt(sqr(x[0]) + sqr(x[1]) + sqr(x[2]));
+
+double plane_intersect(double* p, double* n, double* Rd, double* Ro){
+    double alph,delta;
+
+    normalize(n);
+
+    alph = v3_dot(n, Rd);
+
+    if (fabs(alph) <0.0001) return -1;
+
+    double incident_vector[3];
+    v3_subtract(p, Ro, incident_vector);
+    delta = v3_dot(incident_vector, n);
+
+    double t = delta/alph; 
+
+    if (t<0.0) return -1;
+
+    return t; 
 }
 
 
-
-void v3_reflect(double* x, double* y, double* z)
+double sphere_intersect(double* p, double r, double* Rd, double* Ro)
 {
-    double scalar = 2.0 * v3_dot(x, y);
 
-    double tmp[3];
+     double a, b;
+    double vector_diff[3];
+    v3_subtract(Ro, p, vector_diff);
 
-    //printf("not working");
-    v3_scale(y, scalar, tmp);
+    // calculate quadratic formula
+    a = 2 * (Rd[0]*vector_diff[0] + Rd[1]*vector_diff[1] + Rd[2]*vector_diff[2]);
+    b = sqr(vector_diff[0]) + sqr(vector_diff[1]) + sqr(vector_diff[2]) - sqr(r);
 
-    v3_subtract(x, tmp, z);
 
+    // check that discriminant is <, =, or > 0
+    double disc = sqr(a) - 4*b;
+    double t;
+
+   
+    if (disc < 0) return -1;
+
+    disc = sqrt(disc);
+    t = (-a - disc) / 2.0;
+
+    if (t < 0.0) t = (-a + disc) / 2.0;
+
+    if (t < 0.0) return -1;
+
+    return t;
 }
 int shadows(Object objects[], double* newRd, double* newRo, int items, int closestObject, double maxDistance)
 {
-     // Do intersections with new Ron and Rdn of all other objects in the scene(planes or spheres)
     int k;
     int newBest_o = -1;
- 
     normalize(newRd);
     double newBestT = INFINITY;
 
     for(k = 0; k < items; k++)
-    {   // skip the closest object
+    {   
         double newT = 0;
         if (k == closestObject)
-        {
+        { ;
             continue;
         }
         else if(strcmp(objects[k].type, "sphere") == 0){
-            newT = sphereIntersection(objects[k].structures.sphere.position, objects[k].structures.sphere.radius, newRd, newRo);
+            newT = sphere_intersect(objects[k].structures.sphere.position, objects[k].structures.sphere.radius, newRd, newRo);
 
         } else if(strcmp(objects[k].type, "plane") == 0){
-            newT = planeIntersection(objects[k].structures.plane.position, objects[k].structures.plane.normal, newRd, newRo);
+            newT = plane_intersect(objects[k].structures.plane.position, objects[k].structures.plane.normal, newRd, newRo);
         }
 
         if (maxDistance != INFINITY && newT > maxDistance)
@@ -107,17 +155,18 @@ int shadows(Object objects[], double* newRd, double* newRo, int items, int close
 
         if (newT > 0 && newT < newBestT)
         {
-            //best_t = t;
-
+   
             newBest_o = k;
 
         }
 
     }
-    // found no intersections
+
     return newBest_o;
 
 }
+
+
 
 void diffuseHandle(double *objNormal, double *light, double *illumColor, double *objDiffuse, double *outColor) {
 
@@ -131,7 +180,9 @@ void diffuseHandle(double *objNormal, double *light, double *illumColor, double 
         diffuseProduct[1] = objDiffuse[1] * illumColor[1];
         diffuseProduct[2] = objDiffuse[2] * illumColor[2];
 
+        // calculate the diffuse color
         v3_scale(diffuseProduct, normDotLight, outColor);
+
     }
 
     else
@@ -139,15 +190,13 @@ void diffuseHandle(double *objNormal, double *light, double *illumColor, double 
         outColor[0] = 0;
         outColor[1] = 0;
         outColor[2] = 0;
-
     }
 }
 
 
-void specularHandle(double ns, double *light, double *lightRef, double *objNormal,
-                        double *V, double *objSpecular, double *illumColor, double *outColor) {
+void specularHandle(double ns, double *light, double *lightRef, double *objNormal, double *V, double *objSpecular, double *illumColor, double *outColor) {
 
-    double rayDotLight = v3_dot(light, lightRef);
+    double rayDotLight = v3_dot(V, lightRef);
     double normDotLight = v3_dot(objNormal, light);
 
     if (rayDotLight > 0 && normDotLight > 0)
@@ -172,123 +221,40 @@ void specularHandle(double ns, double *light, double *lightRef, double *objNorma
 
 }
 
-double angular_attenuation(Object objects[], double objectray[3], int items, int light_on)
-{
-        //check if light is not a spotlight. if not, return 1.0
-            double lightDirectionDP = v3_dot(objects[light_on].structures.light.direction, objectray);
-            double fang = pow(lightDirectionDP, objects[light_on].structures.light.angular_a0);
-            return 1.0;
+
+double angular_attenuation(Object objects[], double intersection[3], int items, int currLight)
+{       
+    double thetaRad = objects[currLight].structures.light.theta * (M_PI / 180);
+    double cosTheta = cos(thetaRad);
+    double directZero = objects[currLight].structures.light.direction[0];
+    double directOne = objects[currLight].structures.light.direction[1];
+    double directTwo = objects[currLight].structures.light.direction[2];
+
+					//check if light is not a spotlight. if not, return 1.0
+   if (objects[currLight].structures.light.theta == 0) return 1.0;
+   if (directOne && directTwo && directZero) return 1.0;
+
+    double cosAlph= v3_dot(objects[currLight].structures.light.direction, intersection);
+    if (cosAlph < cosTheta) return 0.0;
+
+    return pow(cosAlph, objects[currLight].structures.light.angular_a0);
 
 }
 
-double radial_attenuation(double a1, double a2, double a0, double distance)
+double radial_attenuation(double aOne, double aTwo, double aZero, double distance)
 {
     if(distance == INFINITY)
     {
-        return 1;
+        return 1.0;
     }
 
-    return 1/(a2*pow(distance,2) + a1*distance + a0);
+    return 1/(aTwo*pow(distance,2) + aOne*distance + aZero);
 
 
 }
-// Plane intersection method returns
-//   where the plane intersects the ray 
-//   and returns a t value.
-double plane_intersect(double* p, double* n, double* Rd, double* Ro){
 
-    normalize(n);
-    double deDot = v3_dot(n, Rd);
-    double c[3];
-    v3_subtract(p, Ro, c);
-
-
-    if (fabs(deDot) < 0.0001f){
-		return -1;
-	}   						
-
-    double t = v3_dot(c, n) / deDot;
-
-									// no intersection
-    if(t < 0.0){
-		return -1;
-	} 
-
-    return t;
-}
-
-
-// Sphere intersection method returns
-//   where the Sphere intersects the ray 
-//   and returns a t value.
-double sphere_intersect(double* p, double r, double* Rd, double* Ro){
-
-    double a, b, c;
-									// calculate quadratic formula
- 
-    a = sqr(Rd[0]) + sqr(Rd[1]) + sqr(Rd[2]);
-    b = 2 * (Rd[0]*(Ro[0]-p[0]) + Rd[1]*(Ro[1]-p[1]) + Rd[2]*(Ro[2]-p[2]));
-    c = sqr(Ro[0]-p[0]) + sqr(Ro[1]-p[1]) + sqr(Ro[2]-p[2]) - sqr(r);
-
-
-									// normalized
-    if (a > 1.0001 || a < .9999){
-        fprintf(stderr, "Ray direction was not normalized correctly");
-        exit(-1);
-
-    }
-
-									// check discriminant
-    double disc = sqr(b) - 4*a*c;
-
-    double t0, t1;  				// t value solutions
-
-									// no intersection
-    if (disc < 0){
-			return -1;		
-	}
-
-
-    else if (disc == 0){			
-        t0 = -1*(b / (2*a));
-        return t0;
-    }
-
-  
-    else{
-        t0 = (-1*b - sqrt(sqr(b) - 4*c))/2;
-        t1 = (-1*b + sqrt(sqr(b) - 4*c))/2;
-    
-    }
-
-									// no intersection
-    if (t0 < 0 && t1 < 0){
-		return -1;
-	}
-
-    else if (t0 < 0 && t1 > 0){
-		return t1;
-	}
-    else if (t0 > 0 && t1 < 0){
-		return t0;
-	}
-   
-    else
-    {
-
-        if (t0 <= t1){
-			return t0;
-		}
-        else{ 
-			return t1;}
-    }
- 
-
-}
-
-// This method casts a ray that tests the intersections of josn objects
-// with the ray and stores the information.
-int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int items){
+int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int items)
+{
 	double cx, cy, h, w, pixelHeight, pixelWidth;
 	int i, x, y;
     double Ro[3] = {0, 0, 0};
@@ -298,62 +264,71 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
 
 	cx = 0;
 	cy = 0;
-	// buffer
+				// buffer
 	buffer->width = width;
 	buffer->height = height;
 	buffer->color = 255;
 
-												//get the size of the view plane
-	for(i = 0; i < items; i++){
-		if(strcmp(objects[i].type, "camera") == 0){
-			h = objects[i].structures.camera.height;
-			w = objects[i].structures.camera.width;
+				// size of the view plane
+	for(i = 0; i < items; i++)
+    {
+		if(strcmp(objects[i].type, "camera") == 0)
+        {
+			h = (double)objects[i].structures.camera.height;
+			w = (double)objects[i].structures.camera.width;
 		}
 	}
 
 	pixelHeight = h / height;
     pixelWidth = w / width;
 
-   // invert y and go through pixels to obtain intersections
-	for (y = 0; y < width; y++){
-        point[1] = -(view[1] - h/2.0 + pixelHeight*(y + 0.5));
-		for (x = 0; x < height; x++){
+	for (y = 0; y < width; y++)
+    {
+		for (x = 0; x < height; x++)
+		{   point[1] = -(view[1] - h/2.0 + pixelHeight*(y + 0.5));
+
             point[0] = view[0] - w/2.0 + pixelWidth*(x + 0.5);
             normalize(point);
-			// normalize Rd
 			Rd[0] = point[0];
             Rd[1] = point[1];
             Rd[2] = point[2];
+            
+
             double best_t = INFINITY;
-										// Go through each of the objects at each pixel 
-										//   to carry out intersection calculaions.
-			int best_i = 0;
-			for (i = 0; i < items; i++){
+
+            int best_i = 0;
+			for (i = 0; i < items; i++)
+            {
 				double t = 0;
 				if(strcmp(objects[i].type, "sphere") == 0){
+
 					t = sphere_intersect(objects[i].structures.sphere.position, objects[i].structures.sphere.radius,Rd, Ro);
-				} 
-				else if(strcmp(objects[i].type, "plane") == 0){
+                    
+				} else if(strcmp(objects[i].type, "plane") == 0){
+
 					t = plane_intersect(objects[i].structures.plane.position, objects[i].structures.plane.normal, Rd, Ro);
+                 
 				}
 
-				if (t > 0 && t < best_t){
-								// location on view plane
+              
+				if (t > 0 && t < best_t)
+                {
 					best_t = t;
                     best_i = i;
+                  
 				}
 				int l,k;
                 double* color = malloc(sizeof(double)*3);
 
-									// color of the current intersection into the image buffer
-				if(best_t > 0 && best_t != INFINITY)
+                
+				if(best_t > 0 && best_t != INFINITY && best_t != -1)
                 {
                     if(strcmp(objects[best_i].type, "sphere") == 0)
-                    {  
-                        color[0] = 0;//ambientColor[0];
-                        color[1] = 0;//ambientColor[1];
-                        color[2] = 0;//ambientColor[2];
-                        // In order to find a shadow
+                    { 
+                        color[0] = 0;
+                        color[1] = 0;
+                        color[2] = 0;
+                    
                         for (l = 0; l < items; l++)
                         {
                             // Look for a light to see if that object has a shadow casted on it by a light
@@ -366,176 +341,172 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                                 v3_add(temp, Ro, Ron);
                                 v3_subtract(objects[l].structures.light.position, Ron, Rdn);
 
-                                double light_dist = v3_len(Rdn);
+                                double distanceTLight = v3_len(Rdn);
                                 normalize(Rdn);
 
-                                double shadow_intersect = shadows(objects, Rdn, Ron, items, best_i, light_dist);
-                                // there is an object in the way so ad shadow 
-								if(shadow_intersect != -1)
-                                {   
+                                double shadow_intersect = shadows(objects, Rdn, Ron, items, best_i, distanceTLight);
+                                if(shadow_intersect != -1)
+                                {  
+
                                     continue;
                                 }
-                                // no object in between item and the light source
                                 else
                                 {
-                                 
                                     double sphere_position[3] = {objects[best_i].structures.sphere.position[0],objects[best_i].structures.sphere.position[1],objects[best_i].structures.sphere.position[2]};
 
                                     double n[3] = {Ron[0] - sphere_position[0], Ron[1]-sphere_position[1], Ron[2]-sphere_position[2]}; 
-
                                     normalize(n);
                                     double vector_L[3] = {Rdn[0], Rdn[1], Rdn[2]}; 
-                                    double distanceVector[3] = {Ron[0] - objects[best_i].structures.light.position[0], Ron[1] - objects[best_i].structures.light.position[1],Ron[2] - objects[best_i].structures.light.position[2]};
+                                    normalize(vector_L);
 
                                     double reflection_L[3];
-                                    double V[3] = {Rd[0], Rd[1], Rd[2]}; 
-									double object_light_range[3];
+                                    normalize(reflection_L);
+                                    double V[3] = {Rd[0], Rd[1], Rd[2]};
+																			
                                     double diffuseColor[3];
                                     double specularColor[3];
-                                    double diffuseSpecular[3];
+                                    double diffuseSpec[3];
+                                    double object_light_range[3];
                                     v3_reflect(vector_L, n, reflection_L); 
-
+									
                                     diffuseHandle(n, vector_L, objects[l].structures.light.color, objects[best_i].structures.sphere.diffuseColor, diffuseColor);
-                                    specularHandle(1, vector_L, reflection_L, n, V, objects[best_i].structures.sphere.specularColor, objects[l].structures.light.color, specularColor);
+                                    specularHandle(20, vector_L, reflection_L, n, V, objects[best_i].structures.sphere.specularColor, objects[l].structures.light.color, specularColor);
 
-                                    v3_add(diffuseColor, specularColor, diffuseSpecular);
+                                    v3_add(diffuseColor, specularColor, diffuseSpec);
 
-                                    v3_scale(vector_L, -1, object_light_range);
+                                    v3_scale(Rdn, -1, object_light_range);
 
-                                    double fang = angular_attenuation(objects, object_light_range, items, l);
-                                    double frad = radial_attenuation(objects[l].structures.light.radial_a1, objects[l].structures.light.radial_a2, objects[l].structures.light.radial_a0, light_dist);
-                                    
-                                    color[0] += frad * fang * diffuseSpecular[0];
-                                    color[1] += frad * fang * diffuseSpecular[1];
-                                    color[2] += frad * fang * diffuseSpecular[2];
+                                    double fang = angular_attenuation(objects, Ron, items, l);
+                                    double frad = radial_attenuation(objects[l].structures.light.radial_a1, objects[l].structures.light.radial_a2, objects[l].structures.light.radial_a0, distanceTLight);
 
-                                    buffer->image[y*3 * buffer->width + x*3].r = clamp(color[0]) *255;
-                                    buffer->image[y*3 * buffer->width + x*3+1].g = clamp(color[1]) *255;
-                                    buffer->image[y*3 * buffer->width + x*3+2].b = clamp(color[2]) *255;
+                                    color[0] += frad * fang * diffuseSpec[0];
+                                    color[1] += frad * fang * diffuseSpec[1];
+                                    color[2] += frad * fang * diffuseSpec[2];
                                 }
 
                             }
 
                         }
-					else if(strcmp(objects[best_i].type, "plane") == 0)
-                    {
-                        color[0] = 0;						//ambientColor[0];
-                        color[1] = 0;						//ambientColor[1];
-                        color[2] = 0;						//ambientColor[2];
-                        // In order to find a shadow
+										// Change object color 
+                        buffer->image[y*3 * buffer->width + x*3].r = clamp(color[0]) *255;
+                        buffer->image[y*3 * buffer->width + x*3+1].g = clamp(color[1]) *255;
+                        buffer->image[y*3 * buffer->width + x*3+2].b = clamp(color[2]) *255;
+                    }
+                    else if(strcmp(objects[best_i].type, "plane") == 0)
+                    {   
+
+                        color[0] = 0;
+                        color[1] = 0;
+                        color[2] = 0;
                         for (l = 0; l < items; l++)
                         {
-                            // Look for a light to see if that object has a shadow casted on it by a light
                             if(strcmp(objects[l].type, "light") == 0)
-                            {   // calc new ray origin and direction
+                            {   
                                 double temp[3];
                                 double Ron[3];
                                 double Rdn[3];
                                 v3_scale(Rd, best_t, temp);
                                 v3_add(temp, Ro, Ron);
                                 v3_subtract(objects[l].structures.light.position, Ron, Rdn);
+
+                                double distanceTLight = v3_len(Rdn);
                                 normalize(Rdn);
-                                double light_dist = v3_len(Rdn);
 
-                                double shadow_intersect = shadows(objects, Rdn, Ron, items, best_i, light_dist);
-                                // there is an object in the way so shade in
+                                double shadow_intersect = shadows(objects, Rdn, Ron, items, best_i, distanceTLight);
                                 if(shadow_intersect != -1)
-                                {   
-
+                                {
                                     continue;
                                 }
-													//  no object in between item and the light source
                                 else
                                 {
-                                    double plane_position[3] = {objects[best_i].structures.plane.position[0],objects[best_i].structures.plane.position[1],objects[best_i].structures.plane.position[2]};
-
-                                    double vector_L[3] = {Rdn[0], Rdn[1], Rdn[2]}; 
+                                  
+                                    double n[3] = {objects[best_i].structures.plane.normal[0],objects[best_i].structures.plane.normal[1],objects[best_i].structures.plane.normal[2]};
+                                    normalize(n);
+                                    double vector_L[3] = {Rdn[0], Rdn[1], Rdn[2]};
+                                    normalize(vector_L);
                                     double reflection_L[3];
-                                    double V[3] = {Rd[0], Rd[1], Rd[2]};
+                                    double V[3] = {-Rd[0], -Rd[1], -Rd[2]};
+                                    v3_reflect(vector_L, n, reflection_L);
+                                    normalize(reflection_L);
                                     double diffuseColor[3];
                                     double specularColor[3];
-                                    double diffuseSpecular[3];
+                                    double diffuseSpec[3];
+
                                     double object_light_range[3];
-                                    v3_reflect(vector_L, Ron, reflection_L); 
 
-                                    diffuseHandle(Ron, vector_L, objects[l].structures.light.color, objects[best_i].structures.plane.diffuseColor, diffuseColor);
-                                    specularHandle(1, vector_L, reflection_L, Ron, V, objects[best_i].structures.plane.specularColor, objects[l].structures.light.color, specularColor);
-
-                                    v3_add(diffuseColor, specularColor, diffuseSpecular);
-
-                                    v3_scale(vector_L, -1, object_light_range);
-
-                                    double fang = angular_attenuation(objects, object_light_range, items, l);
-                                    double frad = radial_attenuation(objects[l].structures.light.radial_a1, objects[l].structures.light.radial_a2, objects[l].structures.light.radial_a0, light_dist);
-									color[0] += frad * fang * diffuseSpecular[0];
-                                    color[1] += frad * fang * diffuseSpecular[1];
-                                    color[2] += frad * fang * diffuseSpecular[2];
-
-                                    buffer->image[y*3 * buffer->width + x*3].r = clamp(color[0]) *255;
-                                    buffer->image[y*3 * buffer->width + x*3+1].g = clamp(color[1]) *255;
-                                    buffer->image[y*3 * buffer->width + x*3+2].b = clamp(color[2]) *255;
+                                    diffuseHandle(n, vector_L, objects[l].structures.light.color, objects[best_i].structures.plane.diffuseColor, diffuseColor);
+                                    specularHandle(20, vector_L, V, n, reflection_L, objects[best_i].structures.plane.specularColor, objects[l].structures.light.color, specularColor);
+                                    v3_add(diffuseColor, specularColor, diffuseSpec);
+                                    v3_scale(Rdn, -1, object_light_range);
+                                    double fang = angular_attenuation(objects, Ron, items, l);
+                                    double frad = radial_attenuation(objects[l].structures.light.radial_a1, objects[l].structures.light.radial_a2, objects[l].structures.light.radial_a0, distanceTLight);
+                                    color[0] += frad * fang * diffuseSpec[0];
+                                    color[1] += frad * fang * diffuseSpec[1];
+                                    color[2] += frad * fang * diffuseSpec[2];
                                 }
 
                             }
+
                         }
+                        buffer->image[y*3 * buffer->width + x*3].r = clamp(color[0]) *255;
+                        buffer->image[y*3 * buffer->width + x*3+1].g = clamp(color[1]) *255;
+                        buffer->image[y*3 * buffer->width + x*3+2].b = clamp(color[2]) *255;
                     }
 
 				}
-				else{ 
-													// no intersection results in background color
+							// no intersection set background color
+				else
+                { 
+
                     buffer->image[y*3 * buffer->width + x*3].r = 0*255 ;
                     buffer->image[y*3 * buffer->width + x*3+1].g = 0*255;
                     buffer->image[y*3 * buffer->width + x*3+2].b = 0*255;
+
 				}
-					free(color);			// free color buffer
+            free(color);
+
 			}
 
 		}
+
 	}
 
 	return 0;
 }
 
-int main(int argc, char *argv[]){
-	if (argc != 5) {										// Error is cmd arguments are not formated correctly
-	fprintf(stderr, "Error: Usage width height output.ppm input.json");
-	exit(1);
-	}
+int main(int argc, char *argv[])
+{
 	FILE *json;
 	int items, i;
-	int ppmFormat = 3;										// slected PPM format (forced)
+	int ppmFormat = 3;
 	double width, height;
-	int w, h;
-	char* fileNameIn;
-	fileNameIn = argv[5];
-	
-	width = atof(argv[1]);									// store desired width and height of image
+	width = atof(argv[1]);
 	height = atof(argv[2]);
 
-	
     Pixmap picbuffer;
     picbuffer.image = (PixelColor*)malloc(sizeof(PixelColor)*width* (height*3));
 
 	json = fopen(argv[4], "r");
-	if(json == NULL){											// if file DNE then end error
+	if(json == NULL)
+    {
 		fprintf(stderr, "Error: could not open file.\n");
 		fclose(json);
-		exit(1);
-	}
-	
-	
+		exit(-1);
 
-	else{
-		items = read_scene(json, objects);						// parse in objects
-        ray_cast(objects, &picbuffer, width, height, items);	// call ray_cast and carry out intersections
+	}
+
+	else
+	{
+		items = read_scene(json, objects);
+        ray_cast(objects, &picbuffer, width, height, items);
 
         int size = height * width;
 
-        ppmWriter(&picbuffer, argv[3], size , ppmFormat);		// send final fata to ppmWriter
-	}
+        ppmWriter(&picbuffer, argv[3], size , ppmFormat);
 
-    fclose(json);						// close file
-    free(picbuffer.image);				// free up malloced data
+	}
+    fclose(json);
+    free(picbuffer.image);
 
 	return 0;
 }
