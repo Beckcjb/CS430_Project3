@@ -21,7 +21,6 @@
 
 									// Includes contain necessary libraries,
 									//  header files, and other c files for the program
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -58,7 +57,6 @@ void v3_reflect(double* x, double* y, double* z)
 
     double tmp[3];
 
-  
     v3_scale(y, scalar, tmp);
 
     v3_subtract(x, tmp, z);
@@ -76,7 +74,8 @@ double clamp(double colorVal){
 
     else   return colorVal;
 }
-//================PLANE INTERSECTION=================
+
+
 
 double plane_intersect(double* p, double* n, double* Rd, double* Ro){
     double alph,delta;
@@ -98,7 +97,6 @@ double plane_intersect(double* p, double* n, double* Rd, double* Ro){
     return t; 
 }
 
-//================SPHERE INTERSECTION=================
 
 double sphere_intersect(double* p, double r, double* Rd, double* Ro)
 {
@@ -128,9 +126,6 @@ double sphere_intersect(double* p, double r, double* Rd, double* Ro)
 
     return t;
 }
-
-//================SHADOW DETECTION=================
-
 int shadows(Object objects[], double* newRd, double* newRo, int items, int closestObject, double maxDistance)
 {
     int k;
@@ -170,8 +165,6 @@ int shadows(Object objects[], double* newRd, double* newRo, int items, int close
 }
 
 
-//================DIFFUSE LIGHT=================
-// Handles the necessary calculations for diffuse light
 
 void diffuseHandle(double *objNormal, double *light, double *illumColor, double *objDiffuse, double *outColor) {
 
@@ -198,8 +191,7 @@ void diffuseHandle(double *objNormal, double *light, double *illumColor, double 
     }
 }
 
-// =============== SPECULAR LIGHT============
-// Handles the necessary calculations for specular lights
+
 void specularHandle(double ns, double *light, double *lightRef, double *objNormal, double *V, double *objSpecular, double *illumColor, double *outColor) {
 
     double rayDotLight = v3_dot(V, lightRef);
@@ -227,7 +219,6 @@ void specularHandle(double ns, double *light, double *lightRef, double *objNorma
 
 }
 
-//==================== ANGULAR ATTENUATION =========
 
 double angular_attenuation(Object objects[], double intersection[3], int items, int currLight)
 {       
@@ -248,8 +239,6 @@ double angular_attenuation(Object objects[], double intersection[3], int items, 
 
 }
 
-// =============== RADIAL ATTENUATION ==================
-
 double radial_attenuation(double aOne, double aTwo, double aZero, double distance)
 {
     if(distance == INFINITY)
@@ -261,7 +250,7 @@ double radial_attenuation(double aOne, double aTwo, double aZero, double distanc
 
 
 }
-// ================= RAY CASTER ===========================
+
 int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int items)
 {
 	double cx, cy, h, w, pixelHeight, pixelWidth;
@@ -287,7 +276,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
 			w = (double)objects[i].structures.camera.width;
 		}
 	}
-	// pixels based off view plane
+
 	pixelHeight = h / height;
     pixelWidth = w / width;
 
@@ -295,16 +284,16 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
     {
 		for (x = 0; x < height; x++)
 		{   point[1] = -(view[1] - h/2.0 + pixelHeight*(y + 0.5));
-			// dot products and normalizing
+
             point[0] = view[0] - w/2.0 + pixelWidth*(x + 0.5);
             normalize(point);
 			Rd[0] = point[0];
             Rd[1] = point[1];
             Rd[2] = point[2];
-            
+            //normalize(Rd);
 
             double best_t = INFINITY;
-		
+
             int best_i = 0;
 			for (i = 0; i < items; i++)
             {
@@ -327,10 +316,9 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                   
 				}
 				int l,k;
-				// allocate memory for colors
                 double* color = malloc(sizeof(double)*3);
 
-                // compare best_t values
+                
 				if(best_t > 0 && best_t != INFINITY && best_t != -1)
                 {
                     if(strcmp(objects[best_i].type, "sphere") == 0)
@@ -353,7 +341,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
 
                                 double distanceTLight = v3_len(Rdn);
                                 normalize(Rdn);
-								// set shadow intersection 
+
                                 double shadow_intersect = shadows(objects, Rdn, Ron, items, best_i, distanceTLight);
                                 if(shadow_intersect != -1)
                                 {  
@@ -361,7 +349,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                                     continue;
                                 }
                                 else
-                                {	// get sphere shadow and intersetions
+                                {
                                     double sphere_position[3] = {objects[best_i].structures.sphere.position[0],objects[best_i].structures.sphere.position[1],objects[best_i].structures.sphere.position[2]};
 
                                     double n[3] = {Ron[0] - sphere_position[0], Ron[1]-sphere_position[1], Ron[2]-sphere_position[2]}; 
@@ -373,19 +361,19 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                                     normalize(reflection_L);
                                     double V[3] = {Rd[0], Rd[1], Rd[2]};
 																			
-                                    double diffuseColor[3]; // diffuse color or sphere
-                                    double specularColor[3]; // specular color of sphere
-                                    double diffuseSpec[3]; // diffuse with specular light
+                                    double diffuseColor[3];
+                                    double specularColor[3];
+                                    double diffuseSpec[3];
                                     double object_light_range[3];
                                     v3_reflect(vector_L, n, reflection_L); 
-									// reflecting of light vectors
+									
                                     diffuseHandle(n, vector_L, objects[l].structures.light.color, objects[best_i].structures.sphere.diffuseColor, diffuseColor);
                                     specularHandle(20, vector_L, reflection_L, n, V, objects[best_i].structures.sphere.specularColor, objects[l].structures.light.color, specularColor);
 
                                     v3_add(diffuseColor, specularColor, diffuseSpec);
 
                                     v3_scale(Rdn, -1, object_light_range);
-									// define attenuation variables and find the necessary attenuation
+
                                     double fang = angular_attenuation(objects, Ron, items, l);
                                     double frad = radial_attenuation(objects[l].structures.light.radial_a1, objects[l].structures.light.radial_a2, objects[l].structures.light.radial_a0, distanceTLight);
 
@@ -404,7 +392,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                     }
                     else if(strcmp(objects[best_i].type, "plane") == 0)
                     {   
-						// initialize color values
+
                         color[0] = 0;
                         color[1] = 0;
                         color[2] = 0;
@@ -413,12 +401,12 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                             if(strcmp(objects[l].type, "light") == 0)
                             {   
                                 double temp[3];
-                                double Ron[3];// new ray origin
-                                double Rdn[3];// new ray direction
+                                double Ron[3];
+                                double Rdn[3];
                                 v3_scale(Rd, best_t, temp);
                                 v3_add(temp, Ro, Ron);
                                 v3_subtract(objects[l].structures.light.position, Ron, Rdn);
-								// set distance to light
+
                                 double distanceTLight = v3_len(Rdn);
                                 normalize(Rdn);
 
