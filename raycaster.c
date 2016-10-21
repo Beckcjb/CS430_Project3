@@ -76,8 +76,7 @@ double clamp(double colorVal){
 
     else   return colorVal;
 }
-
-
+//================PLANE INTERSECTION=================
 
 double plane_intersect(double* p, double* n, double* Rd, double* Ro){
     double alph,delta;
@@ -99,6 +98,7 @@ double plane_intersect(double* p, double* n, double* Rd, double* Ro){
     return t; 
 }
 
+//================SPHERE INTERSECTION=================
 
 double sphere_intersect(double* p, double r, double* Rd, double* Ro)
 {
@@ -128,6 +128,9 @@ double sphere_intersect(double* p, double r, double* Rd, double* Ro)
 
     return t;
 }
+
+//================SHADOW DETECTION=================
+
 int shadows(Object objects[], double* newRd, double* newRo, int items, int closestObject, double maxDistance)
 {
     int k;
@@ -167,6 +170,8 @@ int shadows(Object objects[], double* newRd, double* newRo, int items, int close
 }
 
 
+//================DIFFUSE LIGHT=================
+// Handles the necessary calculations for diffuse light
 
 void diffuseHandle(double *objNormal, double *light, double *illumColor, double *objDiffuse, double *outColor) {
 
@@ -193,7 +198,8 @@ void diffuseHandle(double *objNormal, double *light, double *illumColor, double 
     }
 }
 
-
+// =============== SPECULAR LIGHT============
+// Handles the necessary calculations for specular lights
 void specularHandle(double ns, double *light, double *lightRef, double *objNormal, double *V, double *objSpecular, double *illumColor, double *outColor) {
 
     double rayDotLight = v3_dot(V, lightRef);
@@ -221,6 +227,7 @@ void specularHandle(double ns, double *light, double *lightRef, double *objNorma
 
 }
 
+//==================== ANGULAR ATTENUATION =========
 
 double angular_attenuation(Object objects[], double intersection[3], int items, int currLight)
 {       
@@ -241,6 +248,8 @@ double angular_attenuation(Object objects[], double intersection[3], int items, 
 
 }
 
+// =============== RADIAL ATTENUATION ==================
+
 double radial_attenuation(double aOne, double aTwo, double aZero, double distance)
 {
     if(distance == INFINITY)
@@ -252,7 +261,7 @@ double radial_attenuation(double aOne, double aTwo, double aZero, double distanc
 
 
 }
-
+// ================= RAY CASTER ===========================
 int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int items)
 {
 	double cx, cy, h, w, pixelHeight, pixelWidth;
