@@ -287,7 +287,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
 			w = (double)objects[i].structures.camera.width;
 		}
 	}
-
+	// pixels based off view plane
 	pixelHeight = h / height;
     pixelWidth = w / width;
 
@@ -295,7 +295,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
     {
 		for (x = 0; x < height; x++)
 		{   point[1] = -(view[1] - h/2.0 + pixelHeight*(y + 0.5));
-
+			// dot products and normalizing
             point[0] = view[0] - w/2.0 + pixelWidth*(x + 0.5);
             normalize(point);
 			Rd[0] = point[0];
@@ -304,7 +304,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
             
 
             double best_t = INFINITY;
-
+		
             int best_i = 0;
 			for (i = 0; i < items; i++)
             {
@@ -327,9 +327,10 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                   
 				}
 				int l,k;
+				// allocate memory for colors
                 double* color = malloc(sizeof(double)*3);
 
-                
+                // compare best_t values
 				if(best_t > 0 && best_t != INFINITY && best_t != -1)
                 {
                     if(strcmp(objects[best_i].type, "sphere") == 0)
@@ -352,7 +353,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
 
                                 double distanceTLight = v3_len(Rdn);
                                 normalize(Rdn);
-
+								// set shadow intersection 
                                 double shadow_intersect = shadows(objects, Rdn, Ron, items, best_i, distanceTLight);
                                 if(shadow_intersect != -1)
                                 {  
@@ -360,7 +361,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                                     continue;
                                 }
                                 else
-                                {
+                                {	// get sphere shadow and intersetions
                                     double sphere_position[3] = {objects[best_i].structures.sphere.position[0],objects[best_i].structures.sphere.position[1],objects[best_i].structures.sphere.position[2]};
 
                                     double n[3] = {Ron[0] - sphere_position[0], Ron[1]-sphere_position[1], Ron[2]-sphere_position[2]}; 
@@ -372,19 +373,19 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                                     normalize(reflection_L);
                                     double V[3] = {Rd[0], Rd[1], Rd[2]};
 																			
-                                    double diffuseColor[3];
-                                    double specularColor[3];
-                                    double diffuseSpec[3];
+                                    double diffuseColor[3]; // diffuse color or sphere
+                                    double specularColor[3]; // specular color of sphere
+                                    double diffuseSpec[3]; // diffuse with specular light
                                     double object_light_range[3];
                                     v3_reflect(vector_L, n, reflection_L); 
-									
+									// reflecting of light vectors
                                     diffuseHandle(n, vector_L, objects[l].structures.light.color, objects[best_i].structures.sphere.diffuseColor, diffuseColor);
                                     specularHandle(20, vector_L, reflection_L, n, V, objects[best_i].structures.sphere.specularColor, objects[l].structures.light.color, specularColor);
 
                                     v3_add(diffuseColor, specularColor, diffuseSpec);
 
                                     v3_scale(Rdn, -1, object_light_range);
-
+									// define attenuation variables and find the necessary attenuation
                                     double fang = angular_attenuation(objects, Ron, items, l);
                                     double frad = radial_attenuation(objects[l].structures.light.radial_a1, objects[l].structures.light.radial_a2, objects[l].structures.light.radial_a0, distanceTLight);
 
@@ -403,7 +404,7 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                     }
                     else if(strcmp(objects[best_i].type, "plane") == 0)
                     {   
-
+						// initialize color values
                         color[0] = 0;
                         color[1] = 0;
                         color[2] = 0;
@@ -412,12 +413,12 @@ int ray_cast(Object objects[], Pixmap * buffer, double width, double height, int
                             if(strcmp(objects[l].type, "light") == 0)
                             {   
                                 double temp[3];
-                                double Ron[3];
-                                double Rdn[3];
+                                double Ron[3];// new ray origin
+                                double Rdn[3];// new ray direction
                                 v3_scale(Rd, best_t, temp);
                                 v3_add(temp, Ro, Ron);
                                 v3_subtract(objects[l].structures.light.position, Ron, Rdn);
-
+								// set distance to light
                                 double distanceTLight = v3_len(Rdn);
                                 normalize(Rdn);
 
